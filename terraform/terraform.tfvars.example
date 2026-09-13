@@ -1,0 +1,4 @@
+# Copy to terraform.tfvars and fill in your values (terraform.tfvars is gitignored)
+agent_runtime_arn   = "arn:aws:bedrock-agentcore:us-east-1:<ACCOUNT_ID>:runtime/<RUNTIME_ID>"
+alert_email         = "you@example.com"
+schedule_expression = "rate(1 hour)"

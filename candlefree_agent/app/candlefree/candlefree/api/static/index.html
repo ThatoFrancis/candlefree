@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CandleFree ⚡ — Load Shedding Life Manager</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: {
+      extend: {
+        colors: {
+          surface: '#0b0f19',
+          panel: '#111827',
+          panel2: '#1f2937',
+        },
+        fontFamily: { sans: ['Inter', 'Segoe UI', 'system-ui', 'sans-serif'] },
+      },
+    },
+  };
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  .meeting-block { transition: left 1s ease, background-color 0.5s ease; }
+  @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(245,158,11,.5);} 70% { box-shadow: 0 0 0 12px rgba(245,158,11,0);} 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0);} }
+  .running { animation: pulse-ring 1.5s infinite; }
+</style>
+</head>
+<body class="bg-surface text-slate-100 font-sans min-h-screen">
+<div class="w-full px-6 lg:px-12 py-6 lg:py-8 pb-16">
+
+  <!-- Header -->
+  <header class="flex flex-wrap items-center gap-4 mb-8">
+    <div class="flex items-center gap-3">
+      <div class="w-11 h-11 rounded-2xl bg-amber-400/15 border border-amber-400/30 flex items-center justify-center text-2xl">⚡</div>
+      <div>
+        <h1 class="text-2xl font-extrabold tracking-tight">CandleFree</h1>
+        <p class="text-xs text-slate-400 -mt-0.5">Your load shedding life manager — runs in the background on AWS</p>
+      </div>
+    </div>
+    <div class="ml-auto flex items-center gap-3">
+      <span id="stage" class="px-4 py-1.5 rounded-full text-sm font-bold bg-red-500/15 text-red-400 border border-red-500/30">Stage –</span>
+      <div class="relative">
+        <div class="flex items-center gap-2 bg-panel border border-slate-800 rounded-xl px-3 py-1.5">
+          <span class="text-slate-500 text-xs">📍</span>
+          <input id="areaInput" autocomplete="off" class="bg-transparent text-sm text-slate-200 outline-none w-72 placeholder-slate-500"
+                 placeholder="Type your address or area, then Enter…" />
+        </div>
+        <div id="areaSuggest" class="hidden absolute z-20 mt-1.5 w-full bg-panel border border-slate-700 rounded-xl shadow-2xl shadow-black/50 overflow-hidden"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+
+    <!-- Left: timeline + meetings -->
+    <div class="lg:col-span-2 xl:col-span-3 space-y-6">
+      <section class="bg-panel border border-slate-800 rounded-2xl p-6 shadow-xl shadow-black/20">
+        <h2 class="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-5">Today — outages vs your meetings</h2>
+        <div id="timeline" class="relative h-20 bg-panel2 rounded-xl overflow-hidden ring-1 ring-slate-800"></div>
+        <div id="hours" class="flex justify-between text-[10px] text-slate-500 mt-2 px-0.5"></div>
+        <div class="flex gap-5 mt-4 text-xs text-slate-400">
+          <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-red-500/30 ring-1 ring-red-500"></span> Outage window</span>
+          <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-blue-500"></span> Meeting</span>
+          <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-red-500"></span> Meeting in danger</span>
+        </div>
+      </section>
+
+      <section class="bg-panel border border-slate-800 rounded-2xl p-6 shadow-xl shadow-black/20">
+        <h2 class="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-4">Meetings</h2>
+        <div id="meetings" class="space-y-2.5"></div>
+      </section>
+    </div>
+
+    <!-- Right: agent -->
+    <div class="space-y-6">
+      <section class="bg-panel border border-slate-800 rounded-2xl p-6 shadow-xl shadow-black/20">
+        <h2 class="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-4">Agent</h2>
+        <button id="run" class="w-full py-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold text-base transition disabled:opacity-60 disabled:cursor-wait">
+          ▶ Run CandleFree now
+        </button>
+        <p id="status" class="text-xs text-slate-400 mt-3 leading-relaxed">
+          CandleFree runs automatically every hour on AWS (EventBridge → Lambda → Bedrock AgentCore).
+          This button triggers one pass on demand.
+        </p>
+      </section>
+
+      <section class="bg-panel border border-slate-800 rounded-2xl p-6 shadow-xl shadow-black/20">
+        <h2 class="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-4">Alerts surfaced to you</h2>
+        <div id="alerts" class="space-y-3">
+          <p class="text-sm text-slate-500 italic">Nothing yet — CandleFree only speaks up when it matters.</p>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <footer class="fixed bottom-0 inset-x-0 z-10 text-center text-xs text-slate-500 py-3 bg-surface/80 backdrop-blur border-t border-slate-800/60">
+    Built with Strands Agents SDK · Amazon Bedrock AgentCore · Claude Sonnet 4.6
+  </footer>
+</div>
+
+<script>
+const DAY_START = 6, DAY_END = 24;
+const pct = (d) => {
+  const h = d.getHours() + d.getMinutes() / 60;
+  return Math.max(0, Math.min(100, ((h - DAY_START) / (DAY_END - DAY_START)) * 100));
+};
+const fmt = (iso) => new Date(iso).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
+
+async function load() {
+  const [schedule, meetings, conflicts] = await Promise.all([
+    fetch('/schedule').then(r => r.json()),
+    fetch('/meetings').then(r => r.json()),
+    fetch('/conflicts').then(r => r.json()),
+  ]);
+  document.getElementById('stage').textContent = 'Stage ' + schedule.current_stage;
+  const areaInput = document.getElementById('areaInput');
+  if (document.activeElement !== areaInput) areaInput.value = schedule.area_name.replace(' (demo)', '');
+
+  const conflictIds = new Set(conflicts.map(c => c.meeting.id));
+  const tl = document.getElementById('timeline');
+  tl.innerHTML = '';
+  const today = new Date().toDateString();
+
+  for (const w of schedule.windows) {
+    const s = new Date(w.start), e = new Date(w.end);
+    if (s.toDateString() !== today) continue;
+    const div = document.createElement('div');
+    div.className = 'absolute inset-y-0 bg-red-500/20 border-x-2 border-red-500 flex items-end justify-center pb-1 text-[10px] font-semibold text-red-400';
+    div.style.left = pct(s) + '%';
+    div.style.width = (pct(e) - pct(s)) + '%';
+    div.textContent = 'Stage ' + w.stage;
+    tl.appendChild(div);
+  }
+  for (const m of meetings) {
+    const s = new Date(m.start), e = new Date(m.end);
+    if (s.toDateString() !== today) continue;
+    const conflict = conflictIds.has(m.id);
+    const width = Math.max(1.5, pct(e) - pct(s));
+    const div = document.createElement('div');
+    div.className = 'meeting-block absolute top-2.5 h-8 rounded-full text-white text-[11px] font-semibold shadow-lg flex items-center justify-center px-3 whitespace-nowrap ' + (conflict ? 'bg-red-500 shadow-red-500/30' : 'bg-blue-500 shadow-blue-500/30');
+    div.style.left = pct(s) + '%';
+    div.style.width = width + '%';
+    div.style.minWidth = 'max-content';
+    div.title = `${m.title} (${fmt(m.start)}–${fmt(m.end)})`;
+    div.textContent = m.title;
+    tl.appendChild(div);
+  }
+
+  const hours = document.getElementById('hours');
+  hours.innerHTML = '';
+  for (let h = DAY_START; h <= DAY_END; h += 2) {
+    const span = document.createElement('span');
+    span.textContent = String(h).padStart(2, '0') + ':00';
+    hours.appendChild(span);
+  }
+
+  const list = document.getElementById('meetings');
+  list.innerHTML = '';
+  for (const m of meetings) {
+    const conflict = conflictIds.has(m.id);
+    const row = document.createElement('div');
+    row.className = 'flex items-center justify-between px-4 py-3 rounded-xl bg-panel2 text-sm ' + (conflict ? 'ring-1 ring-red-500/60' : 'ring-1 ring-slate-800');
+    row.innerHTML = `
+      <span class="font-medium">${m.title}</span>
+      <span class="${conflict ? 'text-red-400 font-semibold' : 'text-slate-400'}">
+        ${fmt(m.start)}–${fmt(m.end)}${conflict ? ' · ⚠ outage clash' : ''}
+      </span>`;
+    list.appendChild(row);
+  }
+}
+
+function renderAlerts(alerts) {
+  if (!alerts.length) return;
+  const box = document.getElementById('alerts');
+  box.innerHTML = '';
+  const border = { warning: 'border-amber-400', decision_required: 'border-red-500', info: 'border-emerald-400' };
+  for (const a of alerts.slice().reverse()) {
+    const div = document.createElement('div');
+    div.className = 'rounded-xl bg-panel2 border-l-4 p-4 text-[13px] leading-relaxed whitespace-pre-wrap ring-1 ring-slate-800 ' + (border[a.severity] || 'border-amber-400');
+    div.innerHTML = `<div class="font-bold mb-1.5">${a.title}</div>${a.body}`;
+    box.appendChild(div);
+  }
+}
+
+async function setArea(value) {
+  if (!value) return;
+  await fetch('/area', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ area_id: value }) });
+  hideSuggest();
+  await load();
+}
+
+// --- Address autocomplete (Photon / OpenStreetMap — free, no API key, biased to South Africa) ---
+const areaInput = document.getElementById('areaInput');
+const suggestBox = document.getElementById('areaSuggest');
+let suggestTimer = null;
+
+function hideSuggest() { suggestBox.classList.add('hidden'); suggestBox.innerHTML = ''; }
+
+function placeLabel(p) {
+  return [p.name, p.district, p.city, p.state].filter((v, i, a) => v && a.indexOf(v) === i).join(', ');
+}
+
+async function fetchSuggestions(q) {
+  try {
+    // 1) Live ESP area lookup (real area IDs); returns [] in demo mode
+    const espAreas = await fetch(`/area/search?q=${encodeURIComponent(q)}`).then(r => r.ok ? r.json() : []);
+    let items;
+    if (espAreas.length) {
+      items = espAreas.slice(0, 6).map(a => ({ label: a.region ? `${a.name} — ${a.region}` : a.name, value: a.id }));
+    } else {
+      // 2) Fallback: OpenStreetMap / Photon place names (demo mode)
+      const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lang=en&lat=-26.2&lon=28.05`;
+      const data = await fetch(url).then(r => r.json());
+      const seen = new Set();
+      items = (data.features || [])
+        .map(f => placeLabel(f.properties))
+        .filter(label => label && !seen.has(label) && seen.add(label))
+        .map(label => ({ label, value: label }));
+    }
+    if (!items.length || document.activeElement !== areaInput) { hideSuggest(); return; }
+    suggestBox.innerHTML = '';
+    for (const item of items) {
+      const opt = document.createElement('div');
+      opt.className = 'px-3 py-2 text-sm text-slate-300 hover:bg-panel2 hover:text-amber-300 cursor-pointer truncate';
+      opt.textContent = item.label;
+      opt.title = item.label;
+      opt.addEventListener('mousedown', (e) => { e.preventDefault(); areaInput.value = item.label; setArea(item.value); });
+      suggestBox.appendChild(opt);
+    }
+    suggestBox.classList.remove('hidden');
+  } catch { hideSuggest(); }
+}
+
+areaInput.addEventListener('input', () => {
+  clearTimeout(suggestTimer);
+  const q = areaInput.value.trim();
+  if (q.length < 3) { hideSuggest(); return; }
+  suggestTimer = setTimeout(() => fetchSuggestions(q), 300);
+});
+areaInput.addEventListener('blur', () => setTimeout(hideSuggest, 150));
+
+document.getElementById('areaInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { clearTimeout(suggestTimer); setArea(areaInput.value.trim()); }
+  if (e.key === 'Escape') hideSuggest();
+});
+
+document.getElementById('run').addEventListener('click', async () => {
+  const btn = document.getElementById('run');
+  const status = document.getElementById('status');
+  btn.disabled = true;
+  btn.classList.add('running');
+  btn.textContent = '⏳ CandleFree is thinking…';
+  status.textContent = 'Checking the Eskom schedule, scanning your calendar, resolving conflicts…';
+  try {
+    const res = await fetch('/agent/run', { method: 'POST' }).then(r => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+    renderAlerts(res.alerts);
+    status.textContent = 'Pass complete — conflicts resolved autonomously. Timeline updated.';
+    await load();
+  } catch (e) {
+    status.textContent = 'Agent run failed: ' + e.message + ' (check AWS credentials — see README)';
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('running');
+    btn.textContent = '▶ Run CandleFree now';
+  }
+});
+
+load();
+setInterval(async () => renderAlerts(await fetch('/alerts').then(r => r.json())), 5000);
+</script>
+</body>
+</html>

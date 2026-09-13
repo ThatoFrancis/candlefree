@@ -1,0 +1,8 @@
+[
+  {
+    "name": "default",
+    "description": "CandleFree hackathon deployment",
+    "account": "YOUR_AWS_ACCOUNT_ID",
+    "region": "us-east-1"
+  }
+]

@@ -28,6 +28,20 @@ served from AWS Lambda behind a public Function URL (`terraform/webapp.tf`). The
 role is least-privilege (`bedrock:InvokeModel` + logs only) and a budget alarm guards
 against abuse.
 
+### Testing it (no login or keys needed)
+
+1. Open the live demo URL (first load may take a few seconds — Lambda cold start).
+2. Click **↺ Reset demo** for a fresh scenario: a Stage 4 outage always starts
+   ~45 minutes from now, with *"Client demo (Zoom)"* scheduled inside it — shown as a
+   red conflict on the timeline.
+3. Click **▶ Run CandleFree now** — the Strands agent (Claude Sonnet 4.6 on Bedrock)
+   checks the schedule, finds the clash, reschedules the meeting to the earliest
+   power-safe slot, and raises exactly one alert explaining what it did and why.
+4. Optionally search any South African suburb in the area box — the schedule and
+   timeline update for that area.
+
+To run everything locally instead, see [Quickstart](#quickstart-no-aws-account-needed--demo-mode).
+
 ## Why it matters
 CandleFree runs silently in the background: it watches your area's schedule
 (EskomSePush API), detects when outages clash with your online meetings,

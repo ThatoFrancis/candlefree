@@ -18,7 +18,10 @@ Eskom's load shedding schedule.
 The dashboard runs in demo mode (mock Stage 4 schedule + sample calendar — no keys
 needed). Click **"Run CandleFree now"** to watch the agent think with Claude Sonnet 4.6
 on Amazon Bedrock, resolve the meeting clash autonomously, and surface a single alert.
-First load may take a few seconds (Lambda cold start).
+First load may take a few seconds (Lambda cold start). Note: in demo mode the outage
+windows are synthetic and identical for every area you search — only the area label
+changes (this guarantees a visible conflict to demo). In live mode, schedules are
+fetched per-area from the EskomSePush API.
 
 Hosting: the FastAPI app is wrapped with [Mangum](https://mangum.fastapiexpert.com/) and
 served from AWS Lambda behind a public Function URL (`terraform/webapp.tf`). The Lambda

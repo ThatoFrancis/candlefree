@@ -58,7 +58,7 @@
     <!-- Left: timeline + meetings -->
     <div class="lg:col-span-2 xl:col-span-3 space-y-6">
       <section class="bg-panel border border-slate-800 rounded-2xl p-6 shadow-xl shadow-black/20">
-        <h2 class="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-5">Today — outages vs your meetings</h2>
+        <h2 class="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-5">Next hours — outages vs your meetings</h2>
         <div id="timeline" class="relative h-20 bg-panel2 rounded-xl overflow-hidden ring-1 ring-slate-800"></div>
         <div id="hours" class="flex justify-between text-[10px] text-slate-500 mt-2 px-0.5"></div>
         <div class="flex gap-5 mt-4 text-xs text-slate-400">
@@ -85,6 +85,9 @@
           CandleFree runs automatically every hour on AWS (EventBridge → Lambda → Bedrock AgentCore).
           This button triggers one pass on demand.
         </p>
+        <button id="reset" class="w-full mt-3 py-2 rounded-xl bg-panel2 hover:bg-slate-700 text-slate-400 text-xs font-semibold ring-1 ring-slate-800 transition">
+          ↺ Reset demo
+        </button>
       </section>
 
       <section class="bg-panel border border-slate-800 rounded-2xl p-6 shadow-xl shadow-black/20">
@@ -102,11 +105,13 @@
 </div>
 
 <script>
-const DAY_START = 6, DAY_END = 24;
-const pct = (d) => {
-  const h = d.getHours() + d.getMinutes() / 60;
-  return Math.max(0, Math.min(100, ((h - DAY_START) / (DAY_END - DAY_START)) * 100));
-};
+const WINDOW_HOURS = 18;
+function windowStart() {
+  const d = new Date();
+  d.setMinutes(0, 0, 0);
+  d.setHours(d.getHours() - 3);
+  return d;
+}
 const fmt = (iso) => new Date(iso).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
 
 async function load() {
@@ -122,11 +127,13 @@ async function load() {
   const conflictIds = new Set(conflicts.map(c => c.meeting.id));
   const tl = document.getElementById('timeline');
   tl.innerHTML = '';
-  const today = new Date().toDateString();
+  const ws = windowStart();
+  const we = new Date(ws.getTime() + WINDOW_HOURS * 3600e3);
+  const pct = (d) => Math.max(0, Math.min(100, ((d - ws) / (we - ws)) * 100));
 
   for (const w of schedule.windows) {
     const s = new Date(w.start), e = new Date(w.end);
-    if (s.toDateString() !== today) continue;
+    if (e <= ws || s >= we) continue;
     const div = document.createElement('div');
     div.className = 'absolute inset-y-0 bg-red-500/20 border-x-2 border-red-500 flex items-end justify-center pb-1 text-[10px] font-semibold text-red-400';
     div.style.left = pct(s) + '%';
@@ -136,7 +143,7 @@ async function load() {
   }
   for (const m of meetings) {
     const s = new Date(m.start), e = new Date(m.end);
-    if (s.toDateString() !== today) continue;
+    if (e <= ws || s >= we) continue;
     const conflict = conflictIds.has(m.id);
     const width = Math.max(1.5, pct(e) - pct(s));
     const div = document.createElement('div');
@@ -149,11 +156,19 @@ async function load() {
     tl.appendChild(div);
   }
 
+  // "now" marker
+  const nowLine = document.createElement('div');
+  nowLine.className = 'absolute inset-y-0 w-0.5 bg-amber-400 z-10';
+  nowLine.style.left = pct(new Date()) + '%';
+  nowLine.title = 'Now';
+  tl.appendChild(nowLine);
+
   const hours = document.getElementById('hours');
   hours.innerHTML = '';
-  for (let h = DAY_START; h <= DAY_END; h += 2) {
+  for (let h = 0; h <= WINDOW_HOURS; h += 2) {
+    const t = new Date(ws.getTime() + h * 3600e3);
     const span = document.createElement('span');
-    span.textContent = String(h).padStart(2, '0') + ':00';
+    span.textContent = String(t.getHours()).padStart(2, '0') + ':00';
     hours.appendChild(span);
   }
 
@@ -245,6 +260,12 @@ areaInput.addEventListener('blur', () => setTimeout(hideSuggest, 150));
 document.getElementById('areaInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { clearTimeout(suggestTimer); setArea(areaInput.value.trim()); }
   if (e.key === 'Escape') hideSuggest();
+});
+
+document.getElementById('reset').addEventListener('click', async () => {
+  await fetch('/demo/reset', { method: 'POST' });
+  document.getElementById('alerts').innerHTML = '<p class="text-sm text-slate-500 italic">Nothing yet — CandleFree only speaks up when it matters.</p>';
+  await load();
 });
 
 document.getElementById('run').addEventListener('click', async () => {

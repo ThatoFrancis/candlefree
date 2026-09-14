@@ -14,3 +14,6 @@ terraform/*.tfstate.*
 terraform/.terraform.lock.hcl
 terraform/webapp_build/
 terraform/webapp.zip
+
+# Pitch slides (local only)
+slides.html

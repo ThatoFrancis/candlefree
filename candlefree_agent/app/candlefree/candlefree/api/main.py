@@ -44,6 +44,13 @@ def search_area(q: str) -> list[AreaOption]:
     return get_container().provider.search_areas(q)
 
 
+@app.post("/demo/reset")
+def demo_reset() -> dict[str, str]:
+    """Reset demo state (fresh schedule, meetings, and alerts)."""
+    get_container.cache_clear()
+    return {"status": "reset"}
+
+
 @app.get("/", include_in_schema=False)
 def dashboard() -> FileResponse:
     return FileResponse(_STATIC / "index.html")

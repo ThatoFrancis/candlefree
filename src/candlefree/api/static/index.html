@@ -114,12 +114,14 @@ function windowStart() {
 }
 const fmt = (iso) => new Date(iso).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
 
-async function load() {
-  const [schedule, meetings, conflicts] = await Promise.all([
-    fetch('/schedule').then(r => r.json()),
-    fetch('/meetings').then(r => r.json()),
-    fetch('/conflicts').then(r => r.json()),
-  ]);
+async function load(data) {
+  const [schedule, meetings, conflicts] = data
+    ? [data.schedule, data.meetings, data.conflicts]
+    : await Promise.all([
+        fetch('/schedule').then(r => r.json()),
+        fetch('/meetings').then(r => r.json()),
+        fetch('/conflicts').then(r => r.json()),
+      ]);
   document.getElementById('stage').textContent = 'Stage ' + schedule.current_stage;
   const areaInput = document.getElementById('areaInput');
   if (document.activeElement !== areaInput) areaInput.value = schedule.area_name.replace(' (demo)', '');
@@ -282,7 +284,7 @@ document.getElementById('run').addEventListener('click', async () => {
     });
     renderAlerts(res.alerts);
     status.textContent = 'Pass complete — conflicts resolved autonomously. Timeline updated.';
-    await load();
+    await load(res);
   } catch (e) {
     status.textContent = 'Agent run failed: ' + e.message + ' (check AWS credentials — see README)';
   } finally {

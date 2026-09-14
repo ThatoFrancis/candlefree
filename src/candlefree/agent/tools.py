@@ -1,6 +1,6 @@
 """Strands tools — thin adapters exposing services to the agent."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from strands import tool
 
@@ -44,13 +44,17 @@ def suggest_safe_slot(meeting_id: str) -> str:
     c = get_container()
     meetings = {
         m.id: m
-        for m in c.calendar.get_meetings(datetime.now(), datetime.now().replace(hour=23, minute=59))
+        for m in c.calendar.get_meetings(datetime.now(), datetime.now() + timedelta(hours=48))
     }
     meeting = meetings.get(meeting_id)
     if meeting is None:
         return f"Meeting {meeting_id} not found."
     start, end = c.conflict_service.suggest_safe_slot(c.area_id, meeting)
-    return f"Safe slot for '{meeting.title}': {start:%a %H:%M} to {end:%H:%M}"
+    return (
+        f"Safe slot for '{meeting.title}': {start:%a %d %b %Y %H:%M} to {end:%H:%M}. "
+        f"To move it, call reschedule_meeting with EXACTLY new_start_iso='{start:%Y-%m-%dT%H:%M}' "
+        f"and new_end_iso='{end:%Y-%m-%dT%H:%M}'."
+    )
 
 
 @tool
@@ -63,10 +67,15 @@ def reschedule_meeting(meeting_id: str, new_start_iso: str, new_end_iso: str) ->
         new_end_iso: New end time in ISO format (YYYY-MM-DDTHH:MM).
     """
     c = get_container()
-    updated = c.calendar.reschedule(
-        meeting_id, datetime.fromisoformat(new_start_iso), datetime.fromisoformat(new_end_iso)
-    )
-    return f"Rescheduled '{updated.title}' to {updated.start:%a %H:%M}-{updated.end:%H:%M}."
+    new_start = datetime.fromisoformat(new_start_iso)
+    new_end = datetime.fromisoformat(new_end_iso)
+    if new_start < datetime.now():
+        return (
+            f"ERROR: {new_start_iso} is in the past (now is {datetime.now():%Y-%m-%dT%H:%M}). "
+            "Use the exact ISO times returned by suggest_safe_slot."
+        )
+    updated = c.calendar.reschedule(meeting_id, new_start, new_end)
+    return f"Rescheduled '{updated.title}' to {updated.start:%a %d %b %H:%M}-{updated.end:%H:%M}."
 
 
 @tool

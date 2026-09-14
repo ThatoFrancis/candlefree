@@ -19,6 +19,9 @@ _STATIC = Path(__file__).parent / "static"
 class AgentRunResult(BaseModel):
     summary: str
     alerts: list[Alert]
+    meetings: list[Meeting]
+    conflicts: list[Conflict]
+    schedule: AreaSchedule
 
 
 class AreaUpdate(BaseModel):
@@ -89,7 +92,14 @@ def run_agent() -> AgentRunResult:
         "Run your background check now: inspect the schedule, resolve any meeting "
         "conflicts autonomously, and alert the user only if needed."
     )
-    return AgentRunResult(summary=str(result), alerts=list(getattr(c.notifier, "sent", [])))
+    now = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    return AgentRunResult(
+        summary=str(result),
+        alerts=list(getattr(c.notifier, "sent", [])),
+        meetings=c.calendar.get_meetings(now, now + timedelta(days=2)),
+        conflicts=c.conflict_service.find_conflicts(c.area_id),
+        schedule=c.conflict_service.get_schedule(c.area_id),
+    )
 
 
 @app.get("/alerts", response_model=list[Alert])

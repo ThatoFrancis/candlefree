@@ -71,21 +71,30 @@ def meetings() -> list[Meeting]:
     return c.calendar.get_meetings(now, now + timedelta(days=2))
 
 
+def _apply_area(area: str | None) -> None:
+    """Pin the requested area on this instance (stateless clients pass it per request)."""
+    if area and area.strip():
+        get_container().state["area_id"] = area.strip()
+
+
 @app.get("/schedule", response_model=AreaSchedule)
-def schedule() -> AreaSchedule:
+def schedule(area: str | None = None) -> AreaSchedule:
+    _apply_area(area)
     c = get_container()
     return c.conflict_service.get_schedule(c.area_id)
 
 
 @app.get("/conflicts", response_model=list[Conflict])
-def conflicts() -> list[Conflict]:
+def conflicts(area: str | None = None) -> list[Conflict]:
+    _apply_area(area)
     c = get_container()
     return c.conflict_service.find_conflicts(c.area_id)
 
 
 @app.post("/agent/run", response_model=AgentRunResult)
-def run_agent() -> AgentRunResult:
+def run_agent(area: str | None = None) -> AgentRunResult:
     """Trigger one autonomous background pass of the agent."""
+    _apply_area(area)
     c = get_container()
     agent = AgentFactory.create()
     result = agent(

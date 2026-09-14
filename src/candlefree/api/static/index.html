@@ -114,13 +114,17 @@ function windowStart() {
 }
 const fmt = (iso) => new Date(iso).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
 
+// Selected area survives reloads and is sent with every request (Lambda instances are stateless).
+let currentArea = localStorage.getItem('candlefree_area') || '';
+const areaQS = () => currentArea ? `?area=${encodeURIComponent(currentArea)}` : '';
+
 async function load(data) {
   const [schedule, meetings, conflicts] = data
     ? [data.schedule, data.meetings, data.conflicts]
     : await Promise.all([
-        fetch('/schedule').then(r => r.json()),
+        fetch('/schedule' + areaQS()).then(r => r.json()),
         fetch('/meetings').then(r => r.json()),
-        fetch('/conflicts').then(r => r.json()),
+        fetch('/conflicts' + areaQS()).then(r => r.json()),
       ]);
   document.getElementById('stage').textContent = 'Stage ' + schedule.current_stage;
   const areaInput = document.getElementById('areaInput');
@@ -204,6 +208,8 @@ function renderAlerts(alerts) {
 
 async function setArea(value) {
   if (!value) return;
+  currentArea = value;
+  localStorage.setItem('candlefree_area', value);
   await fetch('/area', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ area_id: value }) });
   hideSuggest();
   await load();
@@ -265,6 +271,8 @@ document.getElementById('areaInput').addEventListener('keydown', (e) => {
 });
 
 document.getElementById('reset').addEventListener('click', async () => {
+  currentArea = '';
+  localStorage.removeItem('candlefree_area');
   await fetch('/demo/reset', { method: 'POST' });
   document.getElementById('alerts').innerHTML = '<p class="text-sm text-slate-500 italic">Nothing yet — CandleFree only speaks up when it matters.</p>';
   await load();
@@ -278,7 +286,7 @@ document.getElementById('run').addEventListener('click', async () => {
   btn.textContent = '⏳ CandleFree is thinking…';
   status.textContent = 'Checking the Eskom schedule, scanning your calendar, resolving conflicts…';
   try {
-    const res = await fetch('/agent/run', { method: 'POST' }).then(r => {
+    const res = await fetch('/agent/run' + areaQS(), { method: 'POST' }).then(r => {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
     });

@@ -12,3 +12,5 @@ terraform/.build/
 terraform/*.tfstate
 terraform/*.tfstate.*
 terraform/.terraform.lock.hcl
+terraform/webapp_build/
+terraform/webapp.zip

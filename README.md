@@ -11,6 +11,20 @@ collapse, and everyone burns time cross-checking outage schedules against their 
 Remote workers, students, and small businesses in South Africa who live around
 Eskom's load shedding schedule.
 
+## 🔴 Live demo
+
+**https://oefh7n5jayqubgxjmdgpdoj3xm0ahwgf.lambda-url.us-east-1.on.aws/**
+
+The dashboard runs in demo mode (mock Stage 4 schedule + sample calendar — no keys
+needed). Click **"Run CandleFree now"** to watch the agent think with Claude Sonnet 4.6
+on Amazon Bedrock, resolve the meeting clash autonomously, and surface a single alert.
+First load may take a few seconds (Lambda cold start).
+
+Hosting: the FastAPI app is wrapped with [Mangum](https://mangum.fastapiexpert.com/) and
+served from AWS Lambda behind a public Function URL (`terraform/webapp.tf`). The Lambda
+role is least-privilege (`bedrock:InvokeModel` + logs only) and a budget alarm guards
+against abuse.
+
 ## Why it matters
 CandleFree runs silently in the background: it watches your area's schedule
 (EskomSePush API), detects when outages clash with your online meetings,
